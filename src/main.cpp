@@ -16,12 +16,16 @@ WebServer server(80);
 
 
 #ifndef WIFI_SSID
-#define WIFI_SSID "your_wifi_name"
+#define WIFI_SSID "WhiteSky-Stillwell"  
 #endif
 
 #ifndef WIFI_PASSWORD
-#define WIFI_PASSWORD "your_wifi_password"
+#define WIFI_PASSWORD "sdhcd2qk"
 #endif
+// WiFi credentials
+const char* ssid = WIFI_SSID;
+const char* password = WIFI_PASSWORD;
+// ----------------------
 
 // 🔧 Initialize DHT sensor
 DHT dht(DHTPIN, DHTTYPE);
@@ -157,11 +161,26 @@ String htmlPage(float tempC, float tempF, float humidity) {
 }
 
 // ----------------------
+// convert RSSI signa strength from dBm to percentage
+int rssItoPercantage(int rssi) {
+  if (rssi <= -100) {
+    return 0; // No signal
+  }else if (rssi >= -50) {
+    return 100; // Excellent signal
+  } else {
+    return (rssi + 100) * 100 / 50; // Convert RSSI to percentage
+  }
+}
+
+// ----------------------
 // 🔁 Loop Function
 // ----------------------
 void loop() {
   ArduinoOTA.handle();
 
+  // variable storing RSSI signal strength
+  int rssi = WiFi.RSSI();
+  int signalPercentage = rssItoPercantage(rssi); // Convert RSSI to percentage
 
   static unsigned long lastReadTime = 0;
   unsigned long currentTime = millis();
@@ -219,6 +238,20 @@ void loop() {
       Serial.print(temperatureC);
       Serial.println(brightness2);
       server.send(200, "text/plain", "Temperature: " + String(temperatureC) + " °C, Humidity: " + String(humidity) + " %"); 
+
+      // Print WiFi status
+      Serial.print("📶 WiFi Status: ");
+      Serial.println(WiFi.status() == WL_CONNECTED ? "Connected" : "Disconnected");
+      // Print Signal Strength
+      Serial.print("📶 Signal Strength :");
+      Serial.println (String(signalPercentage) + " %");
+
+      // Send signal strength to web server
+      server.send(200, "text/plain", "Signal Strength: " + String(signalPercentage) + " %");
+
+      // Print IP Address
+      Serial.print("📡 IP Address: ");
+      Serial.println(WiFi.localIP());
 
     }
   }
