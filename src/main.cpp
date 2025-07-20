@@ -1,260 +1,253 @@
+// main.cpp
+// This file is part of the ESP32 OTA Test project.
 #include <Arduino.h>
-#include <WiFi.h>
-#include <ArduinoOTA.h>
-#include "DHT.h"
+#include <DHT.h>
 #include <WebServer.h>
+#include <ArduinoOTA.h>
+#include "WiFiManager.h"
+#include "LEDControl.h"
+#include "SensorHandler.h"
+#include "config.h"
+#include "TelnetDebug.h"
 
-// Calling the WebServer library to handle HTTP requests
-WebServer server(80);
-
-// 💡 Pin Definitions
-#define LED_R_PIN 18        // GPIO 18 for LED
-#define LED_G_PIN 19        // GPIO 19 for LED
-#define LED_B_PIN 21        // GPIO 21 for LED
-#define DHTPIN 4          // GPIO 22 for DHT data
-#define DHTTYPE DHT11     // Change to DHT11 or DHT21 if you're using those
-
+// 🔌 Pin and sensor setup
+#define LED_R_PIN 18
+#define LED_G_PIN 19
+#define LED_B_PIN 21
+#define DHTPIN 4
+#define DHTTYPE DHT11
 
 #ifndef WIFI_SSID
-#define WIFI_SSID "WhiteSky-Stillwell"  
+#define WIFI_SSID "WhiteSky-Stillwell"
 #endif
 
 #ifndef WIFI_PASSWORD
 #define WIFI_PASSWORD "sdhcd2qk"
 #endif
-// WiFi credentials
-const char* ssid = WIFI_SSID;
-const char* password = WIFI_PASSWORD;
-// ----------------------
 
-// 🔧 Initialize DHT sensor
-DHT dht(DHTPIN, DHTTYPE);
-
-// ----------------------
-// 📡 WiFi Manager Class
-// ----------------------
-class WiFiManager {
-public:
-  WiFiManager(const char* ssid, const char* password)
-    : ssid(ssid), password(password) {}
-
-  void connect() {
-    Serial.println("🔌 Connecting to WiFi...");
-    WiFi.begin(ssid, password);
-
-    while (WiFi.waitForConnectResult() != WL_CONNECTED) {
-      Serial.println("❌ WiFi Failed! Rebooting in 5 seconds...");
-      blinkLED();
-      delay(5000);
-      ESP.restart();
-    }
-
-    Serial.println("✅ Connected to WiFi");
-    digitalWrite(BUILTIN_LED, HIGH); // Turn on LED
-    printWiFiDetails();
-  }
-
-  void printWiFiDetails() {
-    Serial.print("📶 IP Address: ");
-    Serial.println(WiFi.localIP());
-    Serial.print("📶 Signal Strength (RSSI): ");
-    Serial.println(WiFi.RSSI());
-    Serial.print("📡 Status: ");
-    Serial.println(WiFi.status() == WL_CONNECTED ? "Connected" : "Disconnected");
-    Serial.print("📡 SSID: ");
-    Serial.println(WiFi.SSID());
-  }
-
-private:
-  const char* ssid;
-  const char* password;
-
-  void blinkLED() {
-    pinMode(BUILTIN_LED, OUTPUT);
-    for (int i = 0; i < 3; i++) {
-      digitalWrite(BUILTIN_LED, HIGH);
-      delay(300);
-      digitalWrite(BUILTIN_LED, LOW);
-      delay(300);
-    }
-  }
-};
-
-// 🔧 Global Object
+WebServer server(80);
+// DHT dht(DHTPIN, DHTTYPE);
 WiFiManager wifiManager(WIFI_SSID, WIFI_PASSWORD);
+LEDControl ledController(LED_R_PIN, LED_G_PIN, LED_B_PIN);
+SensorHandler sensorHandler(DHTPIN, DHTTYPE);
 
-// Function prototype for htmlPage
-String htmlPage(float tempC, float tempF, float humidity);
-
-// ----------------------
-// 🔁 Setup Function
-// ----------------------
-void setup() {
-  Serial.begin(115200);
-  delay(1000);
-
-  pinMode(BUILTIN_LED, OUTPUT);
-  digitalWrite(BUILTIN_LED, LOW);
-
-  wifiManager.connect();
-
-  dht.begin(); // Start DHT sensor 
-
-  Serial.println("🌡️ DHT Sensor Initialized");
-  Serial.print("DHT Sensor Type: ");
-  if (DHTTYPE == DHT11) {
-    Serial.println("DHT11");
-  } else if (DHTTYPE == DHT21) {
-    Serial.println("DHT21");
-  } else {
-    Serial.println("Unknown DHT Sensor Type");
-  }
-
-  // Set all the ledSetup bellow 
-  ledcSetup(0, 5000, 8); // Channel 0, 5kHz frequency, 8-bit resolution assigned to R LED
-  ledcSetup(1,5000, 8); // Channel 1, 5kHz frequency, 8-bit resolution assigned to G LED
-  ledcSetup(2, 5000, 8); // Channel 2, 5kHz frequency, 8-bit resolution assigned to B LED
-  // PWM setup for LED
-
-  ledcAttachPin(LED_R_PIN, 0); // Attach LED_Red_PIN to channel 0
-  ledcAttachPin(LED_G_PIN, 1); // Attach LED_Green_PIN to channel 1
-  ledcAttachPin(LED_B_PIN, 2); // Attach LED_Blue_PIN to channel 2
-
-  ArduinoOTA.setHostname("ESP32-OTA-Test");
-  ArduinoOTA.begin();
-
-  Serial.println("📡 OTA Ready. Waiting for uploads...");
-
-  // Setup web server route
-  server.on("/", HTTP_GET, []() {
-    float humidity = dht.readHumidity();
-    float temperatureC = dht.readTemperature();
-    float temperatureF = dht.readTemperature(true);
-    if (isnan(humidity) || isnan(temperatureC)) {
-        server.send(500, "text/plain", "⚠️ Failed to read from DHT sensor!");
-    } else {
-        Serial.print("🌡️ The Tile Temp is: ");
-        Serial.print(temperatureF);
-        Serial.print(" °F / ");
-        Serial.print(temperatureC);
-        Serial.println(" °C");
-
-        Serial.print("💧 Humidity levels in your Home: ");
-        Serial.print(humidity);
-        Serial.println(" %"); 
-        String html = htmlPage(temperatureC, temperatureF, humidity);
-        server.send(200, "text/html", html);
-    }
-  });
-  server.begin();
-  Serial.println("🌐 Web Server started. Access it at http://" + WiFi.localIP().toString() + "/");
+// Convert RSSI (signal strength) to percentage
+int rssiToPercentage(int rssi) {
+  if (rssi <= -100) return 0;
+  if (rssi >= -50) return 100;
+  return (rssi + 100) * 100 / 50;
 }
 
-// Create HTML page for the web server
+// Web page content
 String htmlPage(float tempC, float tempF, float humidity) {
-  String page = "<html><body>";
-  page += "<h1>ESP32 DHT Sensor</h1>";
-  page += "<p>Temperature: " + String(tempC) + " °C / " + String(tempF) + " °F</p>";
-  page += "<p>Humidity: " + String(humidity) + " %</p>";
-  page += "</body></html>";
+  int red = map(tempF, 60, 80, 50, 255);
+  int green = map(humidity, 60, 80, 50, 255);
+  int blue = map(tempC, 60, 80, 50, 255);
+
+  red = constrain(red, 0, 255);
+  green = constrain(green, 0, 255);
+  blue = constrain(blue, 0, 255);
+
+  String page = R"rawliteral(
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <meta charset="UTF-8">
+    <title>ESP32 Home Dashboard</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen;
+        background: linear-gradient(to top, #1e3c72, #2a5298);
+        color: white;
+        text-align: center;
+      }
+      .card {
+        background: rgba(255, 255, 255, 0.1);
+        border.radius: 20px;
+        padding: 15px;
+        backdrop-filter: bluer(10px);
+        box-shadow: 0 4px 10px rgba(0,0,0,0,3);
+        display: inline-bock;
+        width: 280px;
+      }
+
+      .label {
+        font-size: 18px;
+        color: #ccc;
+      }
+
+      .value {
+        font-size: 36px;
+        font-weight: 600;
+        margin-top: 5px;
+      }
+
+      .led-bar {
+        height: 15px;
+        width: 100%;
+        background: #333;
+        border-radius: 10px;
+        overflow: hidden:
+        margin-top: 10px;
+      }
+
+      .led-fill {
+        height: 100%;
+      }
+
+      .led-r {background: red;}
+      .led-r {background: lime;}
+      .led-r {background: cyan;}
+      
+    </style>
+  </head>
+  <body>
+    <h2>🏠 ESP32 Home Dashboard</h2>
+    <div class="card"> 
+      <div class="label">🌡 Temperature</div>
+      <div class="value">
+  )rawliteral";
+   page += String(tempF, 1) + " °F / " + String(tempC, 1) + " °C</div></div>";
+    page += R"rawliteral(
+    <div class="card">
+      <div class="label">💧 Humidity</div>
+      <div class="value">)rawliteral";
+    page += String(humidity, 1) + " %</div></div>";
+
+    page += R"rawliteral(
+    <div class="card">
+      <div class="label">🔆 LED Brightness</div>
+      <div class="led-bar"><div class="led-fill led-r" style="width:)rawliteral";
+    page += String((red / 255.0) * 100) + R"rawliteral(%"></div></div>
+      <div class="led-bar"><div class="led-fill led-g" style="width:)rawliteral";
+    page += String((green / 255.0) * 100) + R"rawliteral(%"></div></div>
+      <div class="led-bar"><div class="led-fill led-b" style="width:)rawliteral";
+    page += String((blue / 255.0) * 100) + R"rawliteral(%"></div></div>
+
+    </div>
+  </body>
+  </html>
+  )rawliteral";
+
   return page;
 }
 
-// ----------------------
-// convert RSSI signa strength from dBm to percentage
-int rssItoPercantage(int rssi) {
-  if (rssi <= -100) {
-    return 0; // No signal
-  }else if (rssi >= -50) {
-    return 100; // Excellent signal
-  } else {
-    return (rssi + 100) * 100 / 50; // Convert RSSI to percentage
-  }
+void setup() {
+  Serial.begin(115200);
+  pinMode(BUILTIN_LED, OUTPUT);
+  digitalWrite(BUILTIN_LED, LOW);
+
+  Serial.println("MAC Address : " + WiFi.macAddress());
+  Serial.println("Firmware Version : " + String(ESP.getSdkVersion()));
+  Serial.print("IP Address : " );
+  Serial.println(WiFi.localIP());
+
+  wifiManager.connect();
+  setupTelnet();
+
+  Serial.println("🌐 WiFi Connected");
+  ArduinoOTA.setHostname("esp32-ota-test");
+  ArduinoOTA.begin();
+  Serial.println("📡 OTA Ready");
+
+  // Telnet Debug logs
+
+  TPRINT("🔧 Setup started");
+  TPRINT("📡 ESP32 IP Address");
+  TPRINTLN(WiFi.localIP());
+  TPRINTLN("📡 OTA Ready");
+
+  sensorHandler.begin();
+  ledController.begin();
+
+    // Setup web server route
+  server.on("/", HTTP_GET, []() {
+    float humidity = sensorHandler.getHumidity();
+    float tempC = sensorHandler.getTemperatureC();
+    float tempF = sensorHandler.getTemperatureF();
+
+    if (isnan(humidity) || isnan(tempC)) {
+      server.send(500, "text/plain", "⚠️ Failed to read from DHT sensor!");
+    } else {
+      server.send(200, "text/html", htmlPage(tempC, tempF, humidity));
+    }
+  });
+
+  server.begin();
+  Serial.println("🌐 Web Server started at http://" + WiFi.localIP().toString());
 }
 
-// ----------------------
-// 🔁 Loop Function
-// ----------------------
 void loop() {
   ArduinoOTA.handle();
+  server.handleClient();
+  handleTelnet();
 
-  // variable storing RSSI signal strength
-  int rssi = WiFi.RSSI();
-  int signalPercentage = rssItoPercantage(rssi); // Convert RSSI to percentage
+  static unsigned long lastRead = 0;
+  if (millis() - lastRead > 5000) {
+    lastRead = millis();
 
-  static unsigned long lastReadTime = 0;
-  unsigned long currentTime = millis();
+    float humidity = sensorHandler.getHumidity();
+    float tempC = sensorHandler.getTemperatureC();
+    float tempF = sensorHandler.getTemperatureF();
 
-  if (currentTime - lastReadTime >= 5000) { // every 5 seconds
-    lastReadTime = currentTime;
-
-    float humidity = dht.readHumidity();
-    float temperatureC = dht.readTemperature();
-    float temperatureF = dht.readTemperature(true);
-
-    if (isnan(humidity) || isnan(temperatureC)) {
+    if (isnan(humidity) || isnan(tempC)) {
       Serial.println("⚠️ Failed to read from DHT sensor!");
-    } else {
-      Serial.print("🌡️ The Tile Temp is: ");
-      Serial.print(temperatureF);
-      Serial.print(" °F / ");
-      Serial.print(temperatureC);
-      Serial.println(" °C");
-
-      Serial.print("💧 Humidity levels in your Home: ");
-      Serial.print(humidity);
-      Serial.println(" %");
-
-      // Map temperature to brightness adjust based on temperature
-      int brightness = map(temperatureF, 77, 80, 50, 255); // Map temperature to brightness
-      int brightness1 = map(humidity, 60, 70, 50, 255); // Map humidity to brightness
-      int brightness2 = map(temperatureC, 30, 35, 50, 255); // Map temperature to brightness
-
-      //// 💡 Adjust LED Brightness Based on Temperature
-      brightness = constrain(brightness, 0, 255); // Ensure brightness is within
-      brightness1 = constrain(brightness1, 0, 255); // Ensure brightness is within
-      brightness2 = constrain(brightness2, 0, 255); // Ensure brightness is within
-
-      ledcWrite(0, brightness); // Write brightness to LED
-      ledcWrite(1, brightness1); // Write brightness to Green LED
-      ledcWrite(2, brightness2); // Write brightness to Blue LED
-
-      // Print brightness values to Serial Monitor for red LED
-      Serial.print("💡 RED LED Brightness: ");
-      Serial.println(brightness);
-      server.send(200, "text/plain", "Temperature: " + String(temperatureC) + " °C, Humidity: " + String(humidity) + " %");
-
-     // Green LED Brightness based on humidity
-      Serial.print("💡 Green LED Brightness: ");
-      Serial.print(brightness1);
-      Serial.print(" for Humidity: ");
-      Serial.print(humidity);
-      Serial.println(brightness1);
-
-      // Blue LED Brightness based on temperature
-      Serial.print("💡 Blue LED Brightness: ");
-      Serial.print(brightness2);
-      Serial.print(" for Temperature: ");
-      Serial.print(temperatureC);
-      Serial.println(brightness2);
-      server.send(200, "text/plain", "Temperature: " + String(temperatureC) + " °C, Humidity: " + String(humidity) + " %"); 
-
-      // Print WiFi status
-      Serial.print("📶 WiFi Status: ");
-      Serial.println(WiFi.status() == WL_CONNECTED ? "Connected" : "Disconnected");
-      // Print Signal Strength
-      Serial.print("📶 Signal Strength :");
-      Serial.println (String(signalPercentage) + " %");
-
-      // Send signal strength to web server
-      server.send(200, "text/plain", "Signal Strength: " + String(signalPercentage) + " %");
-
-      // Print IP Address
-      Serial.print("📡 IP Address: ");
-      Serial.println(WiFi.localIP());
-
+      return;
     }
+
+    int rssi = WiFi.RSSI();
+    int signalPercent = rssiToPercentage(rssi);
+
+    Serial.printf("🌡️ %.2f °F / %.2f °C, 💧 %.2f %%\n", tempF, tempC, humidity);
+    Serial.print("📶 Signal: ");
+    Serial.println(String(signalPercent) + " %");
+
+    // Print IP address data
+    Serial.print("IP Address :");
+    Serial.println(WiFi.localIP());
+
+    // Brightness calculations
+    int redBrightness = map(tempF, 77, 80, 50, 255);
+    int greenBrightness = map(humidity, 50, 77, 50, 255);
+    int blueBrightness = map(tempC, 30, 35, 50, 255);
+
+    ledController.update(
+      constrain(redBrightness, 0, 255),
+      constrain(greenBrightness, 0, 255),
+      constrain(blueBrightness, 0, 255)
+    );
+
+    Serial.println("LED Red Brightness level :");
+    Serial.println(redBrightness);
+
+    Serial.println("LED Green Brightness level :");
+    Serial.println(greenBrightness);
+
+    Serial.print("LED Blue Brightness level :");
+    Serial.println(blueBrightness);
+
+    //Telnet Printing to remote terminal
+
+    TPRINT("🌡️ Temp: ");
+    TPRINT(sensorHandler.getTemperatureC());
+    TPRINT(" °C / ");
+    TPRINT(sensorHandler.getTemperatureF());
+    TPRINTLN(" °F");
+
+    TPRINT("💧 Humidity: ");
+    TPRINTLN(sensorHandler.getHumidity());
+
+    TPRINT("📶 WiFi Signal Strenght: ");
+    TPRINT( String(signalPercent));
+    TPRINTLN(" %");
+
+    // LED Brightness
+    TPRINT(" LED red brightness :");
+    TPRINTLN(redBrightness);
+
+
   }
-  server.handleClient(); // Handle incoming HTTP requests
-  delay(10); // Small delay to avoid blocking
+
+  delay(10);
 }
