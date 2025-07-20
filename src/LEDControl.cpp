@@ -10,12 +10,12 @@ LEDControl::LEDControl(uint8_t redPin, uint8_t greenPin, uint8_t bluePin)
 
 void LEDControl::begin() {
     ledcSetup(0, 5000, 8); // Red
-    ledcSetup(2, 5000, 8); // Green
-    ledcSetup(1, 5000, 8); // Blue
+    ledcSetup(1, 5000, 8); // Green
+    ledcSetup(2, 5000, 8); // Blue
 
     ledcAttachPin(rPin, 0);
-    ledcAttachPin(gPin, 2);
-    ledcAttachPin(bPin, 1);
+    ledcAttachPin(gPin, 1);
+    ledcAttachPin(bPin, 2);
 
     ledcWrite(0, 0); // Initialize Red LED
     ledcWrite(1, 0); // Initialize Green LED

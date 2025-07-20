@@ -40,95 +40,119 @@ int rssiToPercentage(int rssi) {
 
 // Web page content
 String htmlPage(float tempC, float tempF, float humidity) {
-  int red = map(tempF, 60, 80, 50, 255);
-  int green = map(humidity, 60, 80, 50, 255);
-  int blue = map(tempC, 60, 80, 50, 255);
+  int red = map(tempF, 77, 80, 50, 255);
+  int green = map(humidity, 50, 77, 50, 255);
+  int blue = map(tempC, 30, 35, 50, 255);
 
   red = constrain(red, 0, 255);
   green = constrain(green, 0, 255);
   blue = constrain(blue, 0, 255);
 
   String page = R"rawliteral(
-  <!DOCTYPE html>
-  <html>
-  <head>
-    <meta charset="UTF-8">
-    <title>ESP32 Home Dashboard</title>
-    <style>
-      body {
-        margin: 0;
-        font-family: apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen;
-        background: linear-gradient(to top, #1e3c72, #2a5298);
-        color: white;
-        text-align: center;
-      }
-      .card {
-        background: rgba(255, 255, 255, 0.1);
-        border.radius: 20px;
-        padding: 15px;
-        backdrop-filter: bluer(10px);
-        box-shadow: 0 4px 10px rgba(0,0,0,0,3);
-        display: inline-bock;
-        width: 280px;
-      }
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>ESP32 Home Dashboard</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen;
+      background: linear-gradient(to bottom, #1e3c72, #2a5298);
+      color: white;
+      text-align: center;
+    }
 
-      .label {
-        font-size: 18px;
-        color: #ccc;
-      }
+    .dashboard {
+      padding: 30px 10px;
+    }
 
-      .value {
-        font-size: 36px;
-        font-weight: 600;
-        margin-top: 5px;
-      }
+    .card {
+      background: rgba(255, 255, 255, 0.07);
+      border-radius: 20px;
+      padding: 30px 20px;
+      margin: 20px auto;
+      backdrop-filter: blur(15px);
+      box-shadow: 0 4px 30px rgba(0,0,0,0.25);
+      width: 90%;
+      max-width: 400px;
+    }
 
-      .led-bar {
-        height: 15px;
-        width: 100%;
-        background: #333;
-        border-radius: 10px;
-        overflow: hidden:
-        margin-top: 10px;
-      }
+    .label {
+      font-size: 20px;
+      font-weight: 400;
+      color: #ddd;
+      margin-bottom: 5px;
+    }
 
-      .led-fill {
-        height: 100%;
-      }
+    .value {
+      font-size: 48px;
+      font-weight: 600;
+      margin-bottom: 15px;
+    }
 
-      .led-r {background: red;}
-      .led-r {background: lime;}
-      .led-r {background: cyan;}
-      
-    </style>
-  </head>
-  <body>
-    <h2>🏠 ESP32 Home Dashboard</h2>
-    <div class="card"> 
-      <div class="label">🌡 Temperature</div>
-      <div class="value">
-  )rawliteral";
-   page += String(tempF, 1) + " °F / " + String(tempC, 1) + " °C</div></div>";
-    page += R"rawliteral(
+    .led-bar-container {
+      background: rgba(0,0,0,0.3);
+      border-radius: 10px;
+      height: 15px;
+      margin: 10px 0;
+      overflow: hidden;
+    }
+
+    .led-bar {
+      height: 100%;
+    }
+
+    .led-r { background: red; }
+    .led-g { background: limegreen; }
+    .led-b { background: deepskyblue; }
+
+    .title {
+      font-size: 26px;
+      font-weight: bold;
+      margin: 10px 0 30px;
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard">
+    <div class="title">🏠 ESP32 Home Dashboard</div>
+
+    <div class="card">
+      <div class="label">🌡️ Temperature</div>
+      <div class="value">)rawliteral";
+  page += String(tempF, 1) + " °F / " + String(tempC, 1) + " °C</div></div>";
+
+  page += R"rawliteral(
     <div class="card">
       <div class="label">💧 Humidity</div>
       <div class="value">)rawliteral";
-    page += String(humidity, 1) + " %</div></div>";
+  page += String(humidity, 1) + " %</div></div>";
 
-    page += R"rawliteral(
+  page += R"rawliteral(
     <div class="card">
       <div class="label">🔆 LED Brightness</div>
-      <div class="led-bar"><div class="led-fill led-r" style="width:)rawliteral";
-    page += String((red / 255.0) * 100) + R"rawliteral(%"></div></div>
-      <div class="led-bar"><div class="led-fill led-g" style="width:)rawliteral";
-    page += String((green / 255.0) * 100) + R"rawliteral(%"></div></div>
-      <div class="led-bar"><div class="led-fill led-b" style="width:)rawliteral";
-    page += String((blue / 255.0) * 100) + R"rawliteral(%"></div></div>
+
+      <div class="label">🔴 Red: )rawliteral";
+  page += String(red) + R"rawliteral(</div>
+      <div class="led-bar-container"><div class="led-bar led-r" style="width:)rawliteral";
+  page += String((red / 255.0) * 100) + R"rawliteral(%"></div></div>
+
+      <div class="label">🟢 Green: )rawliteral";
+  page += String(green) + R"rawliteral(</div>
+      <div class="led-bar-container"><div class="led-bar led-g" style="width:)rawliteral";
+  page += String((green / 255.0) * 100) + R"rawliteral(%"></div></div>
+
+      <div class="label">🔵 Blue: )rawliteral";
+  page += String(blue) + R"rawliteral(</div>
+      <div class="led-bar-container"><div class="led-bar led-b" style="width:)rawliteral";
+  page += String((blue / 255.0) * 100) + R"rawliteral(%"></div></div>
 
     </div>
-  </body>
-  </html>
-  )rawliteral";
+  </div>
+</body>
+</html>
+)rawliteral";
 
   return page;
 }
