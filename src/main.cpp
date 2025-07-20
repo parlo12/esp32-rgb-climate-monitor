@@ -42,7 +42,7 @@ int rssiToPercentage(int rssi) {
 String htmlPage(float tempC, float tempF, float humidity) {
   int red = map(tempF, 77, 80, 50, 255);
   int green = map(humidity, 50, 77, 50, 255);
-  int blue = map(tempC, 30, 35, 50, 255);
+  int blue = map(tempC, 20, 35, 50, 255);
 
   red = constrain(red, 0, 255);
   green = constrain(green, 0, 255);
@@ -53,6 +53,7 @@ String htmlPage(float tempC, float tempF, float humidity) {
 <html>
 <head>
   <meta charset="UTF-8">
+  <meta http-equiv="refresh" content-"5">
   <title>ESP32 Home Dashboard</title>
   <style>
     body {
@@ -232,9 +233,9 @@ void loop() {
     Serial.println(WiFi.localIP());
 
     // Brightness calculations
-    int redBrightness = map(tempF, 77, 80, 50, 255);
-    int greenBrightness = map(humidity, 50, 77, 50, 255);
-    int blueBrightness = map(tempC, 30, 35, 50, 255);
+    int redBrightness = map(tempF, TEMP_F_MIN, TEMP_F_MAX, 50, 255);
+    int greenBrightness = map(humidity, HUMIDITY_MIN, HUMIDITY_MAX, 50, 255);
+    int blueBrightness = map(tempC, TEMP_C_MIN, TEMP_C_MAX, 50, 255);
 
     ledController.update(
       constrain(redBrightness, 0, 255),

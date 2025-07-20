@@ -3,6 +3,7 @@
 
 #include "LEDControl.h"
 #include <Arduino.h>
+#include "config.h"
 
 LEDControl::LEDControl(uint8_t redPin, uint8_t greenPin, uint8_t bluePin)
     : rPin(redPin), gPin(greenPin), bPin(bluePin),
@@ -25,9 +26,9 @@ void LEDControl::begin() {
 }
 
 void LEDControl::update(float tempF, float tempC, float humidity) {
-    brightnessR = mapAndConstrain(tempF, 77, 80);
-    brightnessG = mapAndConstrain(humidity, 50, 70);
-    brightnessB = mapAndConstrain(tempC, 30, 35);
+    brightnessR = mapAndConstrain(tempF, TEMP_F_MIN, TEMP_F_MAX);
+    brightnessG = mapAndConstrain(humidity, HUMIDITY_MIN, HUMIDITY_MAX);
+    brightnessB = mapAndConstrain(tempC, TEMP_C_MIN, TEMP_C_MAX);
 
     ledcWrite(0, brightnessR);
     ledcWrite(2, brightnessG);

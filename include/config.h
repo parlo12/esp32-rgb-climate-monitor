@@ -13,4 +13,13 @@
 #define DHTPIN 4
 #define DHTTYPE DHT11
 
+#define TEMP_F_MIN 70
+#define TEMP_F_MAX 80
+
+#define TEMP_C_MIN 20
+#define TEMP_C_MAX 35
+
+#define HUMIDITY_MIN 50
+#define HUMIDITY_MAX 70
+
 #endif
